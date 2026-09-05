@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "FastAPI: uvicorn (debug)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "app.main:app",
+        "--host", "127.0.0.1",
+        "--port", "8000",
+        "--reload"
+      ],
+      "envFile": "${workspaceFolder}/.env",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true
+    },
+    {
+      "name": "MAVLink Simulator (dev)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/sim/simulate.py",
+      "env": {
+        "TARGET_HOST": "127.0.0.1",
+        "TARGET_PORT": "14550"
+      },
+      "cwd": "${workspaceFolder}/sim",
+      "justMyCode": true
+    }
+  ]
+}

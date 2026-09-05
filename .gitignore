@@ -1,0 +1,44 @@
+# --- Secrets ---
+.env
+*.env.local
+**/secrets/
+
+# --- Python (backend/, ml/) ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+*.log
+
+# --- Node / frontend ---
+node_modules/
+dist/
+build/
+.next/
+.parcel-cache/
+
+# --- ML artifacts (keep repo light — use Git LFS or external storage for real model weights) ---
+*.pkl
+*.joblib
+*.onnx
+*.h5
+ml/artifacts/
+
+# --- CAD working files (keep source SLDPRT/STEP, ignore local export scratch) ---
+cad/**/*.tmp
+cad/**/~$*
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# --- Docker ---
+*.pid

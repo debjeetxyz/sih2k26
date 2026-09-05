@@ -1,0 +1,2 @@
+cad/*.SLDPRT filter=lfs diff=lfs merge=lfs -text
+cad/*.STEP filter=lfs diff=lfs merge=lfs -text
