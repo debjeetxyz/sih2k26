@@ -1,0 +1,69 @@
+# VayuDev GCS — local/air-gapped deployment.
+#
+# Usage:
+#   Production/air-gapped:  docker compose up -d
+#   With MAVLink simulator: docker compose --profile dev up
+#
+# Air-gap notes:
+#   - `networks.vayudev-net` is a plain bridge so host<->container traffic
+#     (WS/HUD, MAVLink UDP) works. If you want to hard-enforce "no egress"
+#     at the Docker level even during a compromise, add `internal: true`
+#     below — note this also blocks the image from reaching any package
+#     registry from inside a running container, which is the point.
+#   - No service here references an external image registry beyond the
+#     Python base image pulled at build time; nothing pulls from a CDN.
+
+services:
+  backend:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    image: vayudev-backend:latest
+    container_name: vayudev-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - RING_BUFFER_SIZE=${RING_BUFFER_SIZE:-100}
+    ports:
+      - "8000:8000"       # WS + REST API (injector, hud, /api/telemetry/history)
+      - "14550:14550/udp" # MAVLink telemetry feed
+    networks:
+      - vayudev-net
+    security_opt:
+      - no-new-privileges:true
+    read_only: false      # flip to true once logging target is an external volume only
+    volumes:
+      - backend-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).status == 200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # Optional: local MAVLink telemetry generator for offline dev/testing so
+  # the whole stack can be exercised without real radio/serial hardware.
+  # Not part of the production deployment — enable with `--profile dev`.
+  mavlink-sim:
+    build:
+      context: ./sim
+      dockerfile: Dockerfile
+    image: vayudev-mavlink-sim:latest
+    container_name: vayudev-mavlink-sim
+    profiles: ["dev"]
+    depends_on:
+      - backend
+    networks:
+      - vayudev-net
+    environment:
+      - TARGET_HOST=backend
+      - TARGET_PORT=14550
+
+networks:
+  vayudev-net:
+    driver: bridge
+
+volumes:
+  backend-logs:
