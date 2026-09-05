@@ -1,8 +1,8 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 pydantic==2.9.2
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]>=3.3.0
 pymavlink==2.4.41
-numpy==1.26.4
-xgboost==2.1.1
+numpy>=2.0.0
+xgboost>=2.1.1
 websockets==13.1
