@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VayuDev — Engine Health Monitor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+  :root{
+    --bg:#0A0E14; --panel:#10161F; --panel2:#151D28; --line:#232E3B;
+    --text:#E4EDF2; --dim:#7C8B9B; --dimmer:#4C5A69;
+    --cyan:#5EEAD4; --green:#2FBF71; --amber:#FFB020; --red:#E5484D;
+    --mono:'IBM Plex Mono',monospace; --sans:'Space Grotesk',sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); overflow:hidden;}
+  ::selection{background:var(--cyan); color:#000;}
+
+  /* ---------- Login ---------- */
+  #login{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:var(--bg); z-index:100;}
+  #login::before{content:""; position:absolute; inset:0; background:
+     radial-gradient(circle at 20% 30%, rgba(94,234,212,.06), transparent 40%),
+     radial-gradient(circle at 80% 70%, rgba(47,191,113,.05), transparent 40%);}
+  .login-box{position:relative; width:340px; padding:36px 32px; background:var(--panel); border:1px solid var(--line);}
+  .login-box .brand{font-size:13px; letter-spacing:.14em; color:var(--dim); margin-bottom:4px;}
+  .login-box h1{font-size:28px; font-weight:700; margin-bottom:28px; letter-spacing:-.01em;}
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:11px; color:var(--dim); margin-bottom:6px; font-family:var(--mono);}
+  .field input{width:100%; padding:10px 12px; background:var(--bg); border:1px solid var(--line); color:var(--text); font-family:var(--mono); font-size:14px;}
+  .field input:focus{outline:none; border-color:var(--cyan);}
+  #loginBtn{width:100%; margin-top:8px; padding:11px; background:var(--cyan); color:#04211D; border:none; font-family:var(--sans); font-weight:700; font-size:14px; cursor:pointer; letter-spacing:.02em;}
+  #loginBtn:hover{background:#7FF3DE;}
+  .login-note{margin-top:16px; font-size:12px; color:var(--dimmer); font-family:var(--mono);}
+
+  /* ---------- App shell ---------- */
+  #app{display:none; height:100%; flex-direction:column;}
+  #app.active{display:flex;}
+
+  nav{display:flex; align-items:center; gap:24px; height:52px; padding:0 20px; background:var(--panel); border-bottom:1px solid var(--line); flex-shrink:0;}
+  nav .logo{font-weight:700; font-size:15px; letter-spacing:.01em;}
+  nav .logo span{color:var(--cyan);}
+  .mode-toggle{display:flex; border:1px solid var(--line); margin-left:8px;}
+  .mode-toggle button{padding:7px 16px; background:transparent; border:none; color:var(--dim); font-family:var(--mono); font-size:12px; letter-spacing:.05em; cursor:pointer;}
+  .mode-toggle button.active{background:var(--cyan); color:#04211D; font-weight:600;}
+  .conn-status{margin-left:auto; display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; color:var(--dim);}
+  .dot{width:7px; height:7px; border-radius:50%; background:var(--dimmer);}
+  .dot.live{background:var(--green); box-shadow:0 0 8px var(--green); animation:pulse 1.6s infinite;}
+  .dot.err{background:var(--red); box-shadow:0 0 8px var(--red);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  #recordBtn,#loadBtn{padding:6px 12px; background:transparent; border:1px solid var(--line); color:var(--dim); font-family:var(--mono); font-size:11px; cursor:pointer;}
+  #recordBtn.on{border-color:var(--red); color:var(--red);}
+  #fileInput{display:none;}
+
+  /* ---------- Replay bar ---------- */
+  #replayBar{display:none; align-items:center; gap:14px; height:44px; padding:0 20px; background:var(--panel2); border-bottom:1px solid var(--line); flex-shrink:0; font-family:var(--mono); font-size:12px; color:var(--dim);}
+  #replayBar.active{display:flex;}
+  #replayBar button{background:transparent; border:1px solid var(--line); color:var(--text); width:30px; height:26px; cursor:pointer; font-size:12px;}
+  #scrub{flex:1; accent-color:var(--cyan);}
+  #speedSel{background:var(--bg); border:1px solid var(--line); color:var(--text); font-family:var(--mono); font-size:11px; padding:4px 6px;}
+
+  /* ---------- Main grid ---------- */
+  #grid{flex:1; display:grid; grid-template-columns:1.15fr 1fr; grid-template-rows:1fr 1fr; gap:1px; background:var(--line); overflow:hidden;}
+  .panel{background:var(--panel); overflow-y:auto; padding:16px 18px;}
+  .panel h2{font-size:11px; letter-spacing:.12em; color:var(--dim); font-weight:500; margin-bottom:14px; font-family:var(--mono);}
+  #panel3d{grid-column:1 / 3; grid-row:2; padding:0; position:relative;}
+
+  /* telemetry panel */
+  .sensor-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .sensor{border:1px solid var(--line); padding:10px 12px; background:var(--panel2);}
+  .sensor .label{font-size:10px; color:var(--dim); margin-bottom:4px; font-family:var(--mono); letter-spacing:.03em;}
+  .sensor .val{font-family:var(--mono); font-size:19px; font-weight:500;}
+  .sensor .val .unit{font-size:11px; color:var(--dim); margin-left:3px;}
+  .sensor.warn .val{color:var(--amber);}
+  .sensor.crit .val{color:var(--red);}
+
+  /* AI panel */
+  .rul-hero{display:flex; align-items:baseline; gap:10px; margin-bottom:6px;}
+  .rul-hero .num{font-family:var(--mono); font-size:56px; font-weight:600; line-height:1; letter-spacing:-.02em;}
+  .rul-hero .lbl{font-size:12px; color:var(--dim); font-family:var(--mono);}
+  .conf-bar{height:4px; background:var(--panel2); margin-bottom:18px; position:relative; overflow:hidden;}
+  .conf-bar .fill{height:100%; background:var(--cyan);}
+  .conf-label{font-size:11px; color:var(--dim); font-family:var(--mono); margin-bottom:20px;}
+  .cause-box{border-left:3px solid var(--dimmer); padding:10px 14px; margin-bottom:14px; background:var(--panel2);}
+  .cause-box.nominal{border-color:var(--green);}
+  .cause-box.warn{border-color:var(--amber);}
+  .cause-box.crit{border-color:var(--red);}
+  .cause-box .title{font-size:15px; font-weight:600; margin-bottom:4px;}
+  .cause-box .src{font-size:10px; color:var(--dim); font-family:var(--mono); letter-spacing:.04em;}
+  .action-box{font-size:13px; line-height:1.5; color:var(--text); margin-bottom:16px; padding:10px 14px; background:var(--panel2); border-left:3px solid var(--cyan);}
+  .trend-row{display:flex; justify-content:space-between; font-family:var(--mono); font-size:12px; color:var(--dim); padding:8px 0; border-top:1px solid var(--line);}
+  .trend-row b{color:var(--text); font-weight:500;}
+
+  /* 3D panel */
+  #canvas3d{width:100%; height:100%; display:block;}
+  #tooltip3d{position:absolute; display:none; background:var(--panel); border:1px solid var(--line); padding:10px 14px; font-family:var(--mono); font-size:12px; pointer-events:none; min-width:170px; z-index:10;}
+  #tooltip3d .t-title{font-size:13px; font-weight:600; margin-bottom:6px; font-family:var(--sans);}
+  #legend3d{position:absolute; bottom:14px; left:16px; display:flex; gap:16px; font-family:var(--mono); font-size:11px; color:var(--dim);}
+  #legend3d span{display:flex; align-items:center; gap:6px;}
+  #legend3d i{width:9px; height:9px; display:inline-block;}
+  #hint3d{position:absolute; top:14px; left:18px; font-family:var(--mono); font-size:10px; color:var(--dimmer); letter-spacing:.03em;}
+
+  #placeholder{display:flex; align-items:center; justify-content:center; height:100%; color:var(--dimmer); font-family:var(--mono); font-size:13px; text-align:center; line-height:1.8;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="login-box">
+    <div class="brand">VAYUDEV</div>
+    <h1>Engine Health Monitor</h1>
+    <div class="field">
+      <label>OPERATOR ID</label>
+      <input id="user" type="text" placeholder="operator" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>ACCESS CODE</label>
+      <input id="pass" type="password" placeholder="••••••••">
+    </div>
+    <button id="loginBtn">Sign In</button>
+    <div id="loginErr" style="display:none; margin-top:12px; font-size:12px; color:var(--red); font-family:var(--mono);"></div>
+    <div class="login-note">Authorized VayuDev crew only.</div>
+  </div>
+</div>
+
+<!-- CONNECT UAV -->
+<div id="connectUav" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:var(--bg); z-index:99;">
+  <div class="login-box" style="width:380px;">
+    <div class="brand">VAYUDEV</div>
+    <h1 style="font-size:22px;">Connect UAV</h1>
+    <div class="field">
+      <label>SELECT FLIGHT DATA SOURCE</label>
+      <select id="datasetSelect" style="width:100%; padding:10px 12px; background:var(--bg); border:1px solid var(--line); color:var(--text); font-family:var(--mono); font-size:13px;">
+        <option>Loading available flights...</option>
+      </select>
+    </div>
+    <button id="connectUavBtn">Connect</button>
+    <div id="connectErr" style="display:none; margin-top:12px; font-size:12px; color:var(--red); font-family:var(--mono);"></div>
+    <div class="login-note">Selects which recorded flight the engine streams live.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <nav>
+    <div class="logo">VAYU<span>DEV</span></div>
+    <div class="mode-toggle">
+      <button id="modeLive" class="active">LIVE FLIGHT</button>
+      <button id="modeReplay">HISTORIC REPLAY</button>
+    </div>
+    <button id="recordBtn">● Record Session</button>
+    <button id="loadBtn">Load Replay File</button>
+    <input type="file" id="fileInput" accept=".json">
+    <div class="conn-status"><span class="dot" id="connDot"></span><span id="connText">Disconnected</span></div>
+  </nav>
+
+  <div id="replayBar">
+    <button id="rwBtn">◀</button>
+    <button id="playBtn">▶</button>
+    <input type="range" id="scrub" min="0" max="0" value="0">
+    <span id="scrubLabel">0.0s / 0.0s</span>
+    <select id="speedSel">
+      <option value="1">1x</option>
+      <option value="2">2x</option>
+      <option value="4">4x</option>
+      <option value="8">8x</option>
+    </select>
+  </div>
+
+  <div id="grid">
+    <div class="panel" id="telemetryPanel">
+      <h2>COMPONENT TELEMETRY</h2>
+      <div class="sensor-grid" id="sensorGrid"></div>
+    </div>
+
+    <div class="panel" id="aiPanel">
+      <h2>AI DIAGNOSIS</h2>
+      <div id="aiContent">
+        <div id="placeholder">Waiting for telemetry —<br>connect Live Flight or load a Replay file</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel3d">
+      <div id="hint3d">DRAG TO ORBIT · CLICK CYLINDER FOR DETAIL</div>
+      <canvas id="canvas3d"></canvas>
+      <div id="tooltip3d"></div>
+      <div id="legend3d">
+        <span><i style="background:var(--green)"></i>Normal</span>
+        <span><i style="background:var(--amber)"></i>Caution</span>
+        <span><i style="background:var(--red)"></i>Critical</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   AUTH (demo gate only — not real security)
+   ============================================================ */
+/* ============================================================
+   AUTH (client-side name/password gate - real enough to stop casual
+   access, but visible in page source to anyone who looks; NOT a
+   substitute for the team's real backend auth system)
+   ============================================================ */
+const AUTHORIZED_USERS = {
+  'somdeep': '123456', 'debjeet': '123456', 'sagar': '123456',
+  'baishali': '123456', 'payal': '123456', 'subho': '123456',
+};
+document.getElementById('loginBtn').onclick = () => {
+  const u = document.getElementById('user').value.trim().toLowerCase();
+  const p = document.getElementById('pass').value;
+  const err = document.getElementById('loginErr');
+  if(AUTHORIZED_USERS[u] && AUTHORIZED_USERS[u] === p){
+    document.getElementById('login').style.display = 'none';
+    showConnectUav();
+  } else {
+    err.textContent = 'Access denied — unrecognized operator or code.';
+    err.style.display = 'block';
+  }
+};
+
+/* ---- Connect UAV ---- */
+function showConnectUav(){
+  const screen = document.getElementById('connectUav');
+  screen.style.display = 'flex';
+  fetch('/api/datasets').then(r => r.json()).then(data => {
+    const sel = document.getElementById('datasetSelect');
+    sel.innerHTML = '';
+    if(!data.datasets.length){
+      sel.innerHTML = '<option value="">No flight files found</option>';
+      return;
+    }
+    data.datasets.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d; opt.textContent = d;
+      sel.appendChild(opt);
+    });
+  }).catch(() => {
+    document.getElementById('datasetSelect').innerHTML = '<option value="">Could not reach server</option>';
+  });
+}
+document.getElementById('connectUavBtn').onclick = () => {
+  const dataset = document.getElementById('datasetSelect').value;
+  const err = document.getElementById('connectErr');
+  if(!dataset){ err.textContent = 'No flight selected.'; err.style.display = 'block'; return; }
+  fetch('/api/connect_uav', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({dataset})
+  }).then(r => r.json()).then(data => {
+    if(data.error){ err.textContent = data.error; err.style.display = 'block'; return; }
+    document.getElementById('connectUav').style.display = 'none';
+    document.getElementById('app').classList.add('active');
+    onResize();
+    connectLive();
+  }).catch(() => { err.textContent = 'Could not reach server.'; err.style.display = 'block'; });
+};
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let ws = null;
+let mode = 'live';          // 'live' | 'replay'
+let recording = false;
+let sessionBuffer = [];     // frames captured during live mode
+let replayFrames = [];
+let replayIdx = 0;
+let replayPlaying = false;
+let replayTimer = null;
+
+const SENSOR_DEFS = [
+  ['cyl_1_temp','CHT 1','°C'], ['cyl_2_temp','CHT 2','°C'], ['cyl_3_temp','CHT 3','°C'], ['cyl_4_temp','CHT 4','°C'],
+  ['egt_1_temp','EGT 1','°C'], ['egt_2_temp','EGT 2','°C'], ['egt_3_temp','EGT 3','°C'], ['egt_4_temp','EGT 4','°C'],
+  ['oil_pressure','Oil Pressure','bar'], ['oil_temp','Oil Temp','°C'],
+  ['fuel_flow_1','Fuel Flow 1','kg/h'], ['fuel_flow_2','Fuel Flow 2','kg/h'],
+  ['fuel_flow_3','Fuel Flow 3','kg/h'], ['fuel_flow_4','Fuel Flow 4','kg/h'],
+  ['rpm','RPM',''], ['vibration_rms','Vibration','g'],
+];
+
+/* Build sensor grid once */
+const sensorGrid = document.getElementById('sensorGrid');
+SENSOR_DEFS.forEach(([key,label,unit]) => {
+  const div = document.createElement('div');
+  div.className = 'sensor';
+  div.id = 'sensor_' + key;
+  div.innerHTML = `<div class="label">${label}</div><div class="val">— <span class="unit">${unit}</span></div>`;
+  sensorGrid.appendChild(div);
+});
+
+/* ============================================================
+   PAYLOAD -> UI
+   ============================================================ */
+function renderFrame(p){
+  // sensors
+  SENSOR_DEFS.forEach(([key,label,unit]) => {
+    const el = document.getElementById('sensor_' + key);
+    if(!el || p[key] === undefined) return;
+    const v = typeof p[key] === 'number' ? (Math.abs(p[key]) > 100 ? p[key].toFixed(0) : p[key].toFixed(2)) : p[key];
+    el.querySelector('.val').innerHTML = `${v} <span class="unit">${unit}</span>`;
+    el.classList.remove('warn','crit');
+    if(key.startsWith('cyl_') || key.startsWith('egt_')){
+      if(Math.abs(p[key]-450) > 60 || (key.startsWith('cyl_') && p[key] > 150)) el.classList.add('crit');
+    }
+  });
+
+  // AI panel
+  const rul = p.predicted_rul ?? 0;
+  const conf = p.ml_confidence ?? 0;
+  const cause = p.primary_root_cause || 'Nominal Operation';
+  const isNominal = cause === 'Nominal Operation';
+  const isCritical = rul < 100 || (p.recommended_action||'').toLowerCase().includes('abort');
+  const sev = isNominal ? 'nominal' : (isCritical ? 'crit' : 'warn');
+  const rulColor = isNominal ? 'var(--green)' : (isCritical ? 'var(--red)' : 'var(--amber)');
+
+  const trend = p.trend || {};
+  document.getElementById('aiContent').innerHTML = `
+    <div class="rul-hero">
+      <span class="num" style="color:${rulColor}">${rul.toFixed ? rul.toFixed(0) : rul}</span>
+      <span class="lbl">RUL (units)</span>
+    </div>
+    <div class="conf-bar"><div class="fill" style="width:${conf}%"></div></div>
+    <div class="conf-label">ML CONFIDENCE ${conf.toFixed ? conf.toFixed(1) : conf}% &nbsp;·&nbsp; SOURCE: ${p.source || '—'}</div>
+    <div class="cause-box ${sev}">
+      <div class="title">${cause}</div>
+      <div class="src">${(p.missing_fields && p.missing_fields.length) ? 'DEGRADED DATA · ' + p.missing_fields.join(', ') : 'ALL SENSORS NOMINAL'}</div>
+    </div>
+    <div class="action-box">${p.recommended_action || 'No action required.'}</div>
+    <div class="trend-row"><span>TREND</span><b>${trend.direction || '—'}</b></div>
+    <div class="trend-row"><span>RATE</span><b>${trend.slope_per_sec !== undefined ? trend.slope_per_sec.toFixed(2) + ' RUL/s' : '—'}</b></div>
+    <div class="trend-row"><span>TIME TO CRITICAL</span><b>${trend.seconds_to_critical !== null && trend.seconds_to_critical !== undefined ? trend.seconds_to_critical + 's' : '—'}</b></div>
+  `;
+
+  update3D(p, cause);
+}
+
+/* ============================================================
+   WEBSOCKET (Live Flight)
+   ============================================================ */
+const ACCESS_TOKEN = 'vayudev-2026-demo'; // must match ACCESS_TOKEN in inference.py
+
+function connectLive(){
+  if(ws) ws.close();
+  const dot = document.getElementById('connDot');
+  const text = document.getElementById('connText');
+  try{
+    ws = new WebSocket(`wss://${location.hostname}:8000/ws/dashboard?token=${ACCESS_TOKEN}`);
+  }catch(e){
+    dot.className = 'dot err'; text.textContent = 'Connection failed';
+    return;
+  }
+  ws.onopen = () => { dot.className = 'dot live'; text.textContent = 'Live — connected (encrypted)'; };
+  ws.onclose = () => { dot.className = 'dot'; text.textContent = 'Disconnected'; };
+  ws.onerror = () => { dot.className = 'dot err'; text.textContent = 'Connection failed — visit https://localhost:8000/health once to trust the certificate, then reload'; };
+  ws.onmessage = (evt) => {
+    let p;
+    try{ p = JSON.parse(evt.data); }catch(e){ return; }
+    if(mode === 'live'){
+      renderFrame(p);
+      if(recording) sessionBuffer.push(p);
+    }
+  };
+}
+
+/* ============================================================
+   MODE SWITCHING
+   ============================================================ */
+document.getElementById('modeLive').onclick = () => {
+  mode = 'live';
+  document.getElementById('modeLive').classList.add('active');
+  document.getElementById('modeReplay').classList.remove('active');
+  document.getElementById('replayBar').classList.remove('active');
+  stopReplay();
+  connectLive();
+};
+document.getElementById('modeReplay').onclick = () => {
+  mode = 'replay';
+  document.getElementById('modeReplay').classList.add('active');
+  document.getElementById('modeLive').classList.remove('active');
+  document.getElementById('replayBar').classList.add('active');
+  if(ws) ws.close();
+};
+
+/* Recording */
+document.getElementById('recordBtn').onclick = function(){
+  recording = !recording;
+  this.classList.toggle('on', recording);
+  this.textContent = recording ? '■ Stop & Save' : '● Record Session';
+  if(!recording && sessionBuffer.length){
+    const blob = new Blob([JSON.stringify(sessionBuffer)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'vayudev_flight_' + Date.now() + '.json';
+    a.click();
+    sessionBuffer = [];
+  }
+};
+
+/* Load replay file */
+document.getElementById('loadBtn').onclick = () => document.getElementById('fileInput').click();
+document.getElementById('fileInput').onchange = (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try{
+      replayFrames = JSON.parse(evt.target.result);
+      replayIdx = 0;
+      document.getElementById('scrub').max = replayFrames.length - 1;
+      document.getElementById('scrub').value = 0;
+      document.getElementById('modeReplay').click();
+      renderReplayFrame();
+    }catch(err){
+      alert('Could not read that file — expected a VayuDev session JSON.');
+    }
+  };
+  reader.readAsText(file);
+};
+
+/* Replay controls */
+function renderReplayFrame(){
+  if(!replayFrames.length) return;
+  const p = replayFrames[replayIdx];
+  renderFrame(p);
+  const total = replayFrames.length - 1;
+  const dur = (replayFrames[total].timestamp - replayFrames[0].timestamp).toFixed(1);
+  const cur = (p.timestamp - replayFrames[0].timestamp).toFixed(1);
+  document.getElementById('scrubLabel').textContent = `${cur}s / ${dur}s`;
+  document.getElementById('scrub').value = replayIdx;
+}
+document.getElementById('scrub').oninput = (e) => {
+  replayIdx = parseInt(e.target.value);
+  renderReplayFrame();
+};
+document.getElementById('playBtn').onclick = function(){
+  replayPlaying = !replayPlaying;
+  this.textContent = replayPlaying ? '❚❚' : '▶';
+  if(replayPlaying) playReplay(); else clearInterval(replayTimer);
+};
+document.getElementById('rwBtn').onclick = () => { replayIdx = 0; renderReplayFrame(); };
+function playReplay(){
+  const speed = parseInt(document.getElementById('speedSel').value);
+  clearInterval(replayTimer);
+  replayTimer = setInterval(() => {
+    if(replayIdx >= replayFrames.length - 1){ clearInterval(replayTimer); replayPlaying = false; document.getElementById('playBtn').textContent = '▶'; return; }
+    replayIdx++;
+    renderReplayFrame();
+  }, 50 / speed);
+}
+function stopReplay(){ replayPlaying = false; clearInterval(replayTimer); document.getElementById('playBtn').textContent = '▶'; }
+
+/* ============================================================
+   3D ENGINE VISUALIZATION (procedural stand-in geometry)
+   ============================================================ */
+const canvas = document.getElementById('canvas3d');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+camera.position.set(5, 3.5, 6);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.5, 0);
+controls.enableDamping = true;
+
+scene.add(new THREE.AmbientLight(0x8899aa, 0.7));
+const key = new THREE.DirectionalLight(0xffffff, 0.8);
+key.position.set(4,6,4); scene.add(key);
+const rim = new THREE.DirectionalLight(0x5eead4, 0.3);
+rim.position.set(-4,2,-4); scene.add(rim);
+
+/* Engine block (base) */
+const block = new THREE.Mesh(
+  new THREE.BoxGeometry(4.4, 1, 1.3),
+  new THREE.MeshStandardMaterial({color:0x1b232e, metalness:0.4, roughness:0.6})
+);
+block.position.y = 0;
+scene.add(block);
+
+/* 4 cylinders standing on the block */
+const cylinders = [];
+const cylGeo = new THREE.CylinderGeometry(0.42, 0.46, 1.5, 24);
+for(let i=0;i<4;i++){
+  const mat = new THREE.MeshStandardMaterial({color:0x2fbf71, emissive:0x0a2e1a, metalness:0.3, roughness:0.5});
+  const cyl = new THREE.Mesh(cylGeo, mat);
+  cyl.position.set(-1.5 + i*1.0, 1.25, 0);
+  cyl.userData.index = i+1;
+  scene.add(cyl);
+  cylinders.push(cyl);
+
+  // fin detail rings for visual interest
+  for(let f=0; f<3; f++){
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.5, 0.03, 8, 24),
+      new THREE.MeshStandardMaterial({color:0x0c1119, metalness:0.6, roughness:0.4})
+    );
+    ring.rotation.x = Math.PI/2;
+    ring.position.set(cyl.position.x, 0.75 + f*0.35, 0);
+    scene.add(ring);
+  }
+}
+
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+function onResize(){
+  const el = document.getElementById('panel3d');
+  const w = el.clientWidth, h = el.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', onResize);
+new ResizeObserver(onResize).observe(document.getElementById('panel3d'));
+
+/* Color logic driven by live payload */
+function statusColor(sev){
+  if(sev === 'crit') return {c:0xe5484d, e:0x3a0d0f};
+  if(sev === 'warn') return {c:0xffb020, e:0x3a2a08};
+  return {c:0x2fbf71, e:0x0a2e1a};
+}
+
+function update3D(p, cause){
+  const rul = p.predicted_rul ?? 500;
+  const globalSev = rul < 100 ? 'crit' : (rul < 350 ? 'warn' : 'nominal');
+
+  for(let i=0;i<4;i++){
+    const n = i+1;
+    let sev = 'nominal';
+    const mentionsThis = cause.includes('Cylinder ' + n);
+    if(mentionsThis){
+      sev = rul < 150 ? 'crit' : 'warn';
+    } else if(!cause.includes('Cylinder') && cause !== 'Nominal Operation' && !cause.startsWith('Sensor Failure')){
+      // system-wide fault (oil, coking, instability, imbalance, rpm) tints all cylinders
+      sev = globalSev === 'nominal' ? 'warn' : globalSev;
+    }
+    const {c,e} = statusColor(sev);
+    cylinders[i].material.color.setHex(c);
+    cylinders[i].material.emissive.setHex(e);
+    cylinders[i].userData.sev = sev;
+    cylinders[i].userData.temp = p['cyl_' + n + '_temp'];
+    cylinders[i].userData.egt = p['egt_' + n + '_temp'];
+  }
+}
+
+/* Click-to-inspect */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const tooltip = document.getElementById('tooltip3d');
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(cylinders);
+  if(hits.length){
+    const cyl = hits[0].object;
+    const n = cyl.userData.index;
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX - rect.left + 16) + 'px';
+    tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
+    tooltip.innerHTML = `<div class="t-title">Cylinder ${n}</div>
+      CHT: ${cyl.userData.temp !== undefined ? cyl.userData.temp.toFixed(1) : '—'} °C<br>
+      EGT: ${cyl.userData.egt !== undefined ? cyl.userData.egt.toFixed(1) : '—'} °C<br>
+      Status: ${(cyl.userData.sev||'nominal').toUpperCase()}`;
+  } else {
+    tooltip.style.display = 'none';
+  }
+});
+
+/* Connection now starts only after the Connect UAV step succeeds (see
+   connectUavBtn.onclick above), not automatically on page load. */
+</script>
+</body>
+</html>
