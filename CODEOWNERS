@@ -1,0 +1,14 @@
+# This routes PR review requests automatically per folder
+
+## Rows are commented out (#) until we have a real GitHub handle for that
+
+## owner — an invalid/placeholder handle here would make GitHub reject the
+
+## whole file. Uncomment and fill in as teammates are assigned
+
+/backend/    @debjeetxyz
+/frontend/   @BaishaliMandal
+/ml/         @somdeep04-prog
+/cad/        @subhadip-stack
+/postman/    @Sagar059
+/.postman/   @Sagar059

@@ -34,6 +34,7 @@ from app.auth import Role, create_access_token, get_current_role, validate_ws_to
 from app.mavlink_listener import mavlink_udp_listener
 from app.ring_buffer import RingBuffer
 from app.schemas import TelemetryFrame
+from app.smoothing import TelemetrySmoother
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -43,6 +44,12 @@ log = logging.getLogger("vayudev")
 
 RING_BUFFER_SIZE = int(os.getenv("RING_BUFFER_SIZE", "100"))
 ring_buffer = RingBuffer(maxsize=RING_BUFFER_SIZE)
+
+# Single global smoother instance — it tracks per-channel Kalman state over
+# time, so it must persist across frames rather than being recreated per
+# request. There is only one engine's telemetry stream here, so one global
+# instance is the right scope.
+smoother = TelemetrySmoother()
 
 # There's no real user database yet, so token issuance below is gated by a
 # separate bootstrap secret rather than actual credential checking. This is
@@ -109,6 +116,22 @@ async def handle_inbound_frame(frame: TelemetryFrame) -> None:
     before it lands in the ring buffer and gets broadcast.
     """
     enriched = frame.model_dump()
+
+    smoothing_result = smoother.process(enriched)
+    enriched["smoothed"] = smoothing_result.smoothed
+    enriched["kalman_estimate"] = smoothing_result.kalman_estimate
+    enriched["anomaly_flags"] = smoothing_result.anomaly_flags
+    if smoothing_result.any_anomaly:
+        flagged = [
+            ch for ch, is_anom in smoothing_result.anomaly_flags.items() if is_anom
+        ]
+        log.warning(
+            "Anomalous reading (statistical outlier, NOT auto-dropped) on: %s "
+            "(sigma=%s)",
+            flagged,
+            {ch: round(smoothing_result.anomaly_sigma[ch], 2) for ch in flagged},
+        )
+
     enriched.update(
         {
             "predicted_rul": None,

@@ -16,12 +16,14 @@ against a local user store before this touches anything resembling
 production. See main.py for that endpoint's full caveat.
 """
 
+# pyright: reportMissingImports=false
+
 import enum
 import os
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Header, HTTPException, WebSocket
-from jose import JWTError, jwt
+from jose import JWTError, jwt  # type: ignore[reportMissingImports]
 
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
