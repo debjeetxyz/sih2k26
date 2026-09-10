@@ -12,7 +12,7 @@
 #     nothing to fetch at runtime beyond what's baked into the image.
 
 # ---------- Stage 1: build wheels ----------
-FROM python:3.11-slim-bookworm AS builder
+FROM python:3.12-slim-trixie AS builder
 
 WORKDIR /build
 
@@ -29,7 +29,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
 
 # ---------- Stage 2: runtime ----------
-FROM python:3.11-slim-bookworm AS runtime
+FROM python:3.12-slim-trixie AS runtime
 
 # Metadata
 LABEL org.opencontainers.image.title="vayudev-backend" \
