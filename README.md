@@ -8,7 +8,7 @@ Station (GCS) for MALE UAV Rotax 912 ULS aero-piston engines.
 | Folder                  | Owner(s)                | What lives here-------------------------------------------------------------------------------------------------------|
 |-------------------------|-------------------------|-----------------------------------------------------------------------------------------------------------------------|
 | `backend/`              | Debjeet & Sagar         | Telemetry ingestion (WS/UDP), inference pipeline integration, security (JWT/RBAC, MAVLink signing), Docker/deployment |
-| `frontend/`             | Frontend/HUD team       | Three.js/React 3D digital twin HUD                                                                                    |
+| `frontend/`             | Payel & Baishali      | Three.js/React 3D digital twin HUD                                                                                    |
 | `ml/`                   | Somdeep                 | `inference.py` (XGBoost model + physics guardrail), training notebooks, model artifacts                               |
 | `cad/`                  | Subhadip                | Rotax 912 ULS CAD source (`.SLDPRT`, `.STEP`) and reference imagery                                                   |
 | `postman/`, `.postman/` | API/integration owner   | Postman-synced collections, environments, mocks, specs — **edit via Postman app/extension, not by hand**              |
