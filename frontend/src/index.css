@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --color-gcs-bg: #080c11;
+  --color-gcs-panel: #111822;
+  --color-gcs-border: #1f2937;
+  --color-gcs-text: #9ca3af;
+  --color-gcs-highlight: #e5e7eb;
+  --color-gcs-green: #10b981;
+  --color-gcs-amber: #f59e0b;
+  --color-gcs-red: #ef4444;
+  --color-gcs-blue: #3b82f6;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-gcs-bg);
+  color: var(--color-gcs-text);
+  overflow: hidden;
+}
